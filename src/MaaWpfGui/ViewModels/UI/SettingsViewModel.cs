@@ -35,6 +35,7 @@ using MaaWpfGui.Extensions;
 using MaaWpfGui.Helper;
 using MaaWpfGui.Main;
 using MaaWpfGui.Models;
+using MaaWpfGui.Services;
 using MaaWpfGui.Services.HotKeys;
 using MaaWpfGui.Services.Notification;
 using MaaWpfGui.Services.RemoteControl;
@@ -61,9 +62,6 @@ namespace MaaWpfGui.ViewModels.UI
 
         private static readonly ILogger _logger = Log.ForContext<SettingsViewModel>();
 
-        [DllImport("MaaCore.dll")]
-        private static extern IntPtr AsstGetVersion();
-
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
@@ -72,17 +70,75 @@ namespace MaaWpfGui.ViewModels.UI
         [DllImport("user32.dll")]
         private static extern bool IsIconic(IntPtr hWnd);
 
-        private static readonly string _versionId = Marshal.PtrToStringAnsi(AsstGetVersion());
+        /// <summary>
+        /// Gets the core version.
+        /// </summary>
+        public static string CoreVersion { get; } = Marshal.PtrToStringAnsi(MaaService.AsstGetVersion());
+
+        private static readonly string _uiVersion = FileVersionInfo.GetVersionInfo(Application.ResourceAssembly.Location).ProductVersion.Split('+')[0];
 
         /// <summary>
-        /// Gets the version id.
+        /// Gets the UI version.
         /// </summary>
-        public string VersionId => _versionId;
+        public static string UiVersion { get; } = _uiVersion == "0.0.1" ? "DEBUG VERSION" : _uiVersion;
+
+        private static string _resourceVersion = GetResourceVersionByClientType(ConfigurationHelper.GetValue(ConfigurationKeys.ClientType, "Official"));
+
+        public string ResourceVersion
+        {
+            get => _resourceVersion;
+            set => SetAndNotify(ref _resourceVersion, value);
+        }
+
+        private static string GetResourceVersionByClientType(string clientType)
+        {
+            const string OfficialClientType = "Official";
+            const string BilibiliClientType = "Bilibili";
+            string jsonPath = "resource/version.json";
+            if (!(clientType == string.Empty || clientType == OfficialClientType || clientType == BilibiliClientType))
+            {
+                jsonPath = $"resource/global/{clientType}/resource/version.json";
+            }
+
+            string versionName = string.Empty;
+            if (!File.Exists(jsonPath))
+            {
+                return versionName;
+            }
+
+            JObject versionJson = (JObject)JsonConvert.DeserializeObject(File.ReadAllText(jsonPath));
+            var currentTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var poolTime = (ulong)versionJson?["gacha"]?["time"];
+            var activityTime = (ulong)versionJson?["activity"]?["time"];
+
+            if ((currentTime < poolTime) && (currentTime < activityTime))
+            {
+                versionName = string.Empty;
+            }
+            else if ((currentTime >= poolTime) && (currentTime < activityTime))
+            {
+                versionName = versionJson?["gacha"]?["pool"]?.ToString() ?? string.Empty;
+            }
+            else if ((currentTime < poolTime) && (currentTime >= activityTime))
+            {
+                versionName = versionJson?["activity"]?["name"]?.ToString() ?? string.Empty;
+            }
+            else if (poolTime > activityTime)
+            {
+                versionName = versionJson?["gacha"]?["pool"]?.ToString() ?? string.Empty;
+            }
+            else
+            {
+                versionName = versionJson?["activity"]?["name"]?.ToString() ?? string.Empty;
+            }
+
+            return versionName;
+        }
 
         /// <summary>
         /// The Pallas language key.
         /// </summary>
-        public static readonly string PallasLangKey = "pallas";
+        public const string PallasLangKey = "pallas";
 
         /// <summary>
         /// Gets the visibility of task setting views.
@@ -200,7 +256,6 @@ namespace MaaWpfGui.ViewModels.UI
             }
         }
 
-
         private string _remoteControlDeviceIdentity = ConfigurationHelper.GetValue(ConfigurationKeys.RemoteControlDeviceIdentity, string.Empty);
 
         public string RemoteControlDeviceIdentity
@@ -213,7 +268,7 @@ namespace MaaWpfGui.ViewModels.UI
             }
         }
 
-        #endregion
+        #endregion Remote Control
 
         #region External Notifications
 
@@ -455,6 +510,15 @@ namespace MaaWpfGui.ViewModels.UI
 
             _dormThresholdLabel = LocalizationHelper.GetString("DormThreshold") + ": " + _dormThreshold + "%";
 
+            FormationSelectList = new List<CombinedData>
+            {
+                new CombinedData { Display = LocalizationHelper.GetString("Current"), Value = "0" },
+                new CombinedData { Display = "1", Value = "1" },
+                new CombinedData { Display = "2", Value = "2" },
+                new CombinedData { Display = "3", Value = "3" },
+                new CombinedData { Display = "4", Value = "4" },
+            };
+
             RoguelikeModeList = new List<CombinedData>
             {
                 new CombinedData { Display = LocalizationHelper.GetString("RoguelikeStrategyExp"), Value = "0" },
@@ -462,7 +526,6 @@ namespace MaaWpfGui.ViewModels.UI
 
                 // new CombData { Display = "两者兼顾，投资过后退出", Value = "2" } // 弃用
                 // new CombData { Display = Localization.GetString("3"), Value = "3" },  // 开发中
-
                 new CombinedData { Display = LocalizationHelper.GetString("RoguelikeLastReward"), Value = "4" },
             };
 
@@ -825,6 +888,7 @@ namespace MaaWpfGui.ViewModels.UI
                 {
                     // ReSharper disable once SuspiciousTypeConversion.Global
                     var link = (IShellLink)new ShellLink();
+
                     // ReSharper disable once SuspiciousTypeConversion.Global
                     var file = (IPersistFile)link;
                     file.Load(EmulatorPath, 0); // STGM_READ
@@ -834,7 +898,7 @@ namespace MaaWpfGui.ViewModels.UI
                     {
                         fixed (char* ptr = buf)
                         {
-                            link.GetPath(ptr, 260, IntPtr.Zero, 0);  // MAX_PATH
+                            link.GetPath(ptr, 260, IntPtr.Zero, 0); // MAX_PATH
                             var len = Array.IndexOf(buf, '\0');
                             if (len != -1)
                             {
@@ -1091,6 +1155,7 @@ namespace MaaWpfGui.ViewModels.UI
             {
                 SetAndNotify(ref _clientType, value);
                 ConfigurationHelper.SetValue(ConfigurationKeys.ClientType, value);
+                ResourceVersion = GetResourceVersionByClientType(_clientType);
                 UpdateWindowTitle(); /* 每次修改客户端时更新WindowTitle */
                 Instances.TaskQueueViewModel.UpdateStageList(true);
                 Instances.TaskQueueViewModel.UpdateDatePrompt();
@@ -1613,8 +1678,8 @@ namespace MaaWpfGui.ViewModels.UI
 
                             // 根据出当前 ScrollOffset 选出最后一个在可视范围的 Divider 索引
                             var dividerSelect = DividerVerticalOffsetList.Select((n, i) => (
-                            dividerAppeared: value >= n,
-                            index: i));
+                                dividerAppeared: value >= n,
+                                index: i));
 
                             var index = dividerSelect.LastOrDefault(n => n.dividerAppeared).index;
                             SelectedIndex = index;
@@ -1654,7 +1719,7 @@ namespace MaaWpfGui.ViewModels.UI
         private string _roguelikeMode = ConfigurationHelper.GetValue(ConfigurationKeys.RoguelikeMode, "0");
 
         /// <summary>
-        /// 策略，往后打 / 刷一层就退 / 烧热水
+        /// Gets or sets 策略，往后打 / 刷一层就退 / 烧热水
         /// </summary>
         public string RoguelikeMode
         {
@@ -1720,7 +1785,7 @@ namespace MaaWpfGui.ViewModels.UI
         private ObservableCollection<string> _roguelikeCoreCharList = new ObservableCollection<string>();
 
         /// <summary>
-        /// Gets or sets the roguelike core character.
+        /// Gets the roguelike core character.
         /// </summary>
         public ObservableCollection<string> RoguelikeCoreCharList
         {
@@ -1940,6 +2005,27 @@ namespace MaaWpfGui.ViewModels.UI
             {
                 SetAndNotify(ref _creditFightTaskEnabled, value);
                 ConfigurationHelper.SetValue(ConfigurationKeys.CreditFightTaskEnabled, value.ToString());
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets 设置选择的编队
+        /// </summary>
+        // ReSharper disable once MemberCanBePrivate.Global
+        public List<CombinedData> FormationSelectList { get; set; }
+
+        private int _creditFightSelectFormation = Convert.ToInt32(ConfigurationHelper.GetValue(ConfigurationKeys.CreditFightSelectFormation, "0"));
+
+        /// <summary>
+        /// Gets or sets a value indicating which formation will be select in credit fight.
+        /// </summary>
+        public int CreditFightSelectFormation
+        {
+            get => _creditFightSelectFormation;
+            set
+            {
+                SetAndNotify(ref _creditFightSelectFormation, value);
+                ConfigurationHelper.SetValue(ConfigurationKeys.CreditFightSelectFormation, value.ToString());
             }
         }
 
@@ -2275,6 +2361,21 @@ namespace MaaWpfGui.ViewModels.UI
             set => SetAndNotify(ref _useExpedited, value);
         }
 
+        private bool _selectExtraTags = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.SelectExtraTags, bool.FalseString));
+
+        /// <summary>
+        /// Gets or sets a value indicating whether three tags are alway selected when selecting tags.
+        /// </summary>
+        public bool SelectExtraTags
+        {
+            get => _selectExtraTags;
+            set
+            {
+                SetAndNotify(ref _selectExtraTags, value);
+                ConfigurationHelper.SetValue(ConfigurationKeys.SelectExtraTags, value.ToString());
+            }
+        }
+
         private bool _isLevel3UseShortTime = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.IsLevel3UseShortTime, bool.FalseString));
 
         /// <summary>
@@ -2396,7 +2497,7 @@ namespace MaaWpfGui.ViewModels.UI
         /* 软件更新设置 */
 
         private UpdateVersionType _versionType = (UpdateVersionType)Enum.Parse(typeof(UpdateVersionType),
-                ConfigurationHelper.GetValue(ConfigurationKeys.VersionType, UpdateVersionType.Stable.ToString()));
+            ConfigurationHelper.GetValue(ConfigurationKeys.VersionType, UpdateVersionType.Stable.ToString()));
 
         /// <summary>
         /// Gets or sets the type of version to update.
@@ -2557,6 +2658,7 @@ namespace MaaWpfGui.ViewModels.UI
                 case VersionUpdateViewModel.CheckUpdateRetT.OnlyGameResourceUpdated:
                     toastMessage = LocalizationHelper.GetString("GameResourceUpdated");
                     break;
+
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -2922,46 +3024,8 @@ namespace MaaWpfGui.ViewModels.UI
                 prefix += " - ";
             }
 
-            const string OfficialClientType = "Official";
-            const string BilibiliClientType = "Bilibili";
-            string jsonPath = "resource/version.json";
-            if (!(ClientType == string.Empty || ClientType == OfficialClientType || ClientType == BilibiliClientType))
-            {
-                jsonPath = $"resource/global/{ClientType}/resource/version.json";
-            }
-
-            string versionName = string.Empty;
-            if (File.Exists(jsonPath))
-            {
-                JObject versionJson = (JObject)JsonConvert.DeserializeObject(File.ReadAllText(jsonPath));
-                var currentTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                var poolTime = (ulong)versionJson?["gacha"]?["time"];
-                var activityTime = (ulong)versionJson?["activity"]?["time"];
-
-                if ((currentTime < poolTime) && (currentTime < activityTime))
-                {
-                    versionName = string.Empty;
-                }
-                else if ((currentTime >= poolTime) && (currentTime < activityTime))
-                {
-                    versionName = versionJson?["gacha"]?["pool"]?.ToString() ?? string.Empty;
-                }
-                else if ((currentTime < poolTime) && (currentTime >= activityTime))
-                {
-                    versionName = versionJson?["activity"]?["name"]?.ToString() ?? string.Empty;
-                }
-                else if (poolTime > activityTime)
-                {
-                    versionName = versionJson?["gacha"]?["pool"]?.ToString() ?? string.Empty;
-                }
-                else
-                {
-                    versionName = versionJson?["activity"]?["name"]?.ToString() ?? string.Empty;
-                }
-            }
-
-            string poolString = !string.IsNullOrEmpty(versionName) ? $" - {versionName}" : string.Empty;
-            rvm.WindowTitle = $"{prefix}MAA ({CurrentConfiguration}) - {VersionId}{poolString} - {connectConfigName} ({ConnectAddress}) - {ClientName}";
+            string resourceVersion = !string.IsNullOrEmpty(ResourceVersion) ? $" - {ResourceVersion}" : string.Empty;
+            rvm.WindowTitle = $"{prefix}MAA ({CurrentConfiguration}) - {CoreVersion}{resourceVersion} - {connectConfigName} ({ConnectAddress}) - {ClientName}";
         }
 
         private readonly string _bluestacksConfig = GetBluestacksConfig();
@@ -3385,6 +3449,7 @@ namespace MaaWpfGui.ViewModels.UI
                 case DarkModeType.SyncWithOs:
                     ThemeHelper.SwitchToSyncWithOsMode();
                     break;
+
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -3400,7 +3465,8 @@ namespace MaaWpfGui.ViewModels.UI
         private InverseClearType _inverseClearMode =
             Enum.TryParse(ConfigurationHelper.GetValue(ConfigurationKeys.InverseClearMode, InverseClearType.Clear.ToString()),
                 out InverseClearType temp)
-            ? temp : InverseClearType.Clear;
+                ? temp
+                : InverseClearType.Clear;
 
         /// <summary>
         /// Gets or sets the inverse clear mode.
@@ -3424,15 +3490,18 @@ namespace MaaWpfGui.ViewModels.UI
                         Instances.TaskQueueViewModel.ShowInverse = false;
                         Instances.TaskQueueViewModel.SelectedAllWidth = 90;
                         break;
+
                     case InverseClearType.Inverse:
                         Instances.TaskQueueViewModel.InverseMode = true;
                         Instances.TaskQueueViewModel.ShowInverse = false;
                         Instances.TaskQueueViewModel.SelectedAllWidth = 90;
                         break;
+
                     case InverseClearType.ClearInverse:
                         Instances.TaskQueueViewModel.ShowInverse = true;
                         Instances.TaskQueueViewModel.SelectedAllWidth = TaskQueueViewModel.SelectedAllWidthWhenBoth;
                         break;
+
                     default:
                         throw new ArgumentOutOfRangeException();
                 }

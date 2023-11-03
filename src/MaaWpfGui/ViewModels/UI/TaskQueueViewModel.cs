@@ -223,14 +223,11 @@ namespace MaaWpfGui.ViewModels.UI
                 UpdateStageList(false);
 
                 // 随机延迟，防止同时更新
-                var delayTime = new Random().Next(0, 10 * 60 * 1000);
+                var delayTime = new Random().Next(0, 60 * 60 * 1000);
                 _ = Task.Run(async () =>
                 {
                     await Task.Delay(delayTime);
                     await _stageManager.UpdateStageWeb();
-#if RELEASE
-                    ResourceUpdater.UpdateAndToast();
-#endif
                     UpdateDatePrompt();
                     UpdateStageList(false);
                 });
@@ -332,6 +329,7 @@ namespace MaaWpfGui.ViewModels.UI
                 }
 
                 ResetFightVariables();
+                RefreshCustomInfrastPlanIndexByPeriod();
             }
 
             LinkStart();
@@ -670,8 +668,8 @@ namespace MaaWpfGui.ViewModels.UI
         }
 
         private string _inverseShowText = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.MainFunctionInverseMode, bool.FalseString))
-                                            ? LocalizationHelper.GetString("Inverse")
-                                            : LocalizationHelper.GetString("Clear");
+            ? LocalizationHelper.GetString("Inverse")
+            : LocalizationHelper.GetString("Clear");
 
         /// <summary>
         /// Gets or private Sets the text to be displayed for "Select inversely".
@@ -683,8 +681,8 @@ namespace MaaWpfGui.ViewModels.UI
         }
 
         private string _inverseMenuText = Convert.ToBoolean(ConfigurationHelper.GetValue(ConfigurationKeys.MainFunctionInverseMode, bool.FalseString))
-                                            ? LocalizationHelper.GetString("Clear")
-                                            : LocalizationHelper.GetString("Inverse");
+            ? LocalizationHelper.GetString("Clear")
+            : LocalizationHelper.GetString("Inverse");
 
         /// <summary>
         /// Gets or private sets the text of inversion menu.
@@ -800,7 +798,6 @@ namespace MaaWpfGui.ViewModels.UI
             _runningState.SetIdle(true);
             SetStopped();
             return false;
-
         }
 
         /// <summary>
@@ -818,7 +815,8 @@ namespace MaaWpfGui.ViewModels.UI
             // 虽然更改时已经保存过了，不过保险起见还是在点击开始之后再保存一次任务及基建列表
             TaskItemSelectionChanged();
             Instances.SettingsViewModel.InfrastOrderSelectionChanged();
-            RefreshCustomInfrastPlanIndexByPeriod();
+
+            InfrastTaskRunning = true;
 
             ClearLog();
 
@@ -973,11 +971,11 @@ namespace MaaWpfGui.ViewModels.UI
             if (Instances.SettingsViewModel.RoguelikeDelayAbortUntilCombatComplete)
             {
                 await WaitUntilRoguelikeCombatComplete();
-            }
 
-            if (!Stopping)
-            {
-                await Stop();
+                if (Instances.AsstProxy.AsstRunning() && !Stopping)
+                {
+                    await Stop();
+                }
             }
         }
 
@@ -1244,6 +1242,7 @@ namespace MaaWpfGui.ViewModels.UI
 
             return Instances.AsstProxy.AsstAppendMall(
                 !string.IsNullOrEmpty(this.Stage) && Instances.SettingsViewModel.CreditFightTaskEnabled,
+                Instances.SettingsViewModel.CreditFightSelectFormation,
                 Instances.SettingsViewModel.CreditShopping,
                 buyFirst,
                 blackList,
@@ -1289,7 +1288,7 @@ namespace MaaWpfGui.ViewModels.UI
 
             return Instances.AsstProxy.AsstAppendRecruit(
                 maxTimes, reqList.ToArray(), cfmList.ToArray(), Instances.SettingsViewModel.RefreshLevel3, Instances.SettingsViewModel.ForceRefresh, Instances.SettingsViewModel.UseExpedited,
-                Instances.SettingsViewModel.NotChooseLevel1, Instances.SettingsViewModel.IsLevel3UseShortTime, Instances.SettingsViewModel.IsLevel3UseShortTime2);
+                Instances.SettingsViewModel.SelectExtraTags,Instances.SettingsViewModel.NotChooseLevel1, Instances.SettingsViewModel.IsLevel3UseShortTime, Instances.SettingsViewModel.IsLevel3UseShortTime2);
         }
 
         private static bool AppendRoguelike()
@@ -2642,7 +2641,7 @@ namespace MaaWpfGui.ViewModels.UI
             foreach (var plan in CustomInfrastPlanInfoList.Where(
                 plan => plan.PeriodList.Any(
                     period => TimeLess(period.BeginHour, period.BeginMinute, now.Hour, now.Minute)
-                              && TimeLess(now.Hour, now.Minute, period.EndHour, period.EndMinute))))
+                        && TimeLess(now.Hour, now.Minute, period.EndHour, period.EndMinute))))
             {
                 CustomInfrastPlanIndex = plan.Index;
                 return;

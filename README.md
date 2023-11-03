@@ -33,7 +33,7 @@ MAA 的意思是 MAA Assistant Arknights
 ## 亮点功能
 
 - 刷理智，掉落识别及上传 [企鹅物流](https://penguin-stats.cn/)；
-- 智能基建换班，自动计算干员效率，单设施内最优解；同时也支持 [自定义排班](./3.6-基建排班协议.md)；
+- 智能基建换班，自动计算干员效率，单设施内最优解；同时也支持 [自定义排班](https://maa.plus/docs/3.6-基建排班协议.html)；
 - 自动公招，可选使用加急许可，一次全部刷完！公招数据上传 [企鹅物流](https://penguin-stats.cn/result/stage/recruit/recruit)，[一图流](https://yituliu.site/maarecruitdata)；
 - 支持手动识别公招界面，方便对高星公招做出选择； ~~（你的这个高姿回费出的是推王呢还是推王呢）~~
 - 支持识别干员列表，统计已有和未有干员（还能为手动识别公招界面提供已有潜能数据提示）；
@@ -86,7 +86,7 @@ MAA 的意思是 MAA Assistant Arknights
 
 ### CLI支持
 
-MAA 支持命令行界面（CLI）操作，支持 Linux 和 macOS，可用于自动化脚本或在无图形界面的服务器上使用。请参考 [CLI 使用指南](https://maa.plus/docs/1.6-CLI使用指南.html)
+MAA 支持命令行界面（CLI）操作，支持 Linux，macOS 和 Windows，可用于自动化脚本或在无图形界面的服务器上使用。请参考 [CLI 使用指南](https://maa.plus/docs/1.6-CLI使用指南.html)
 
 ## 加入我们
 
@@ -100,7 +100,6 @@ MAA 支持命令行界面（CLI）操作，支持 Linux 和 macOS，可用于自
 - [作业站](https://prts.plus) 后端：[MaaBackendCenter](https://github.com/MaaAssistantArknights/MaaBackendCenter)
 - [官网](https://maa.plus)：[前端](https://github.com/MaaAssistantArknights/maa-website)
 - 深度学习：[MaaAI](https://github.com/MaaAssistantArknights/MaaAI)
-
 
 ### 多语言 (i18n)
 
@@ -191,8 +190,7 @@ MAA 以中文（简体）为第一语言，翻译词条均以中文（简体）�
 
 感谢所有参与到开发/测试中的朋友们，是大家的帮助让 MAA 越来越好！ (\*´▽｀)ノノ
 
-[![Contributors](https://contributors-img.web.app/image?repo=MaaAssistantArknights/MaaAssistantArknights)](https://github.com/MaaAssistantArknights/MaaAssistantArknights/graphs/contributors)
-
+[![Contributors](https://contributors-img.web.app/image?repo=MaaAssistantArknights/MaaAssistantArknights&max=114514&columns=15)](https://github.com/MaaAssistantArknights/MaaAssistantArknights/graphs/contributors)
 
 ## 声明
 
@@ -206,7 +204,7 @@ MAA 以中文（简体）为第一语言，翻译词条均以中文（简体）�
 自动战斗 JSON 作业分享：[prts.plus](https://prts.plus) 或 [抄作业.com](http://抄作业.com)<br>
 Bilibili 直播间：[直播间](https://live.bilibili.com/2808861) 每晚直播敲代码，近期很长一段时间应该都是在写本软件~<br>
 
-技术 & 吹水群（舟无关）：[内卷地狱！(QQ 群)](https://jq.qq.com/?_wv=1027&k=ypbzXcA2)<br>
+技术群（舟无关、禁水）：[内卷地狱！(QQ 群)](https://jq.qq.com/?_wv=1027&k=ypbzXcA2)<br>
 开发者群：[QQ 群](https://jq.qq.com/?_wv=1027&k=JM9oCk3C)<br>
 
 如果觉得软件对你有帮助，帮忙点个 Star 吧！~（网页最上方右上角的小星星），这就是对我们最大的支持了！

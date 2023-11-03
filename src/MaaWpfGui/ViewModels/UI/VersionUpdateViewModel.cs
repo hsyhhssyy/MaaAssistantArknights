@@ -22,15 +22,12 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Documents;
-using System.Windows.Input;
 using MaaWpfGui.Constants;
 using MaaWpfGui.Helper;
 using MaaWpfGui.Main;
 using MaaWpfGui.Models;
+using MaaWpfGui.Services;
 using MaaWpfGui.States;
-using Markdig;
-using Markdig.Wpf;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Semver;
@@ -54,9 +51,6 @@ namespace MaaWpfGui.ViewModels.UI
             _runningState = RunningState.Instance;
         }
 
-        [DllImport("MaaCore.dll")]
-        private static extern IntPtr AsstGetVersion();
-
         private static readonly ILogger _logger = Log.ForContext<VersionUpdateViewModel>();
 
         private static string AddContributorLink(string text)
@@ -70,7 +64,7 @@ namespace MaaWpfGui.ViewModels.UI
             return Regex.Replace(text, @"([^\[`]|^)@([^\s]+)", "$1[@$2](https://github.com/$2)");
         }
 
-        private readonly string _curVersion = Marshal.PtrToStringAnsi(AsstGetVersion());
+        private readonly string _curVersion = Marshal.PtrToStringAnsi(MaaService.AsstGetVersion());
         private string _latestVersion;
 
         private string _updateTag = ConfigurationHelper.GetValue(ConfigurationKeys.VersionName, string.Empty);
@@ -116,8 +110,6 @@ namespace MaaWpfGui.ViewModels.UI
             }
         }
 
-        public FlowDocument UpdateInfoDoc => Markdig.Wpf.Markdown.ToFlowDocument(UpdateInfo,
-            new MarkdownPipelineBuilder().UseSupportedExtensions().Build());
 
         private string _updateUrl;
 
@@ -408,7 +400,7 @@ namespace MaaWpfGui.ViewModels.UI
                 }
 #else
                 // 跑个空任务避免 async warning
-                await Task.Run(() => {});
+                await Task.Run(() => { });
 #endif
             }
         }
@@ -427,7 +419,7 @@ namespace MaaWpfGui.ViewModels.UI
             if (resRet == ResourceUpdater.UpdateResult.Success)
             {
                 Instances.SettingsViewModel.IsCheckingForUpdates = false;
-                return CheckUpdateRetT.OK;
+                return CheckUpdateRetT.OnlyGameResourceUpdated;
             }
 
             Instances.SettingsViewModel.IsCheckingForUpdates = false;
@@ -973,18 +965,5 @@ namespace MaaWpfGui.ViewModels.UI
             }
         }
         */
-
-        /// <summary>
-        /// The event handler of opening hyperlink.
-        /// </summary>
-        /// <param name="sender">The sender.</param>
-        /// <param name="e">The event arguments.</param>
-        // xaml 里用到了
-        // ReSharper disable once UnusedMember.Global
-        // ReSharper disable once UnusedParameter.Global
-        public void OpenHyperlink(object sender, ExecutedRoutedEventArgs e)
-        {
-            Process.Start(e.Parameter.ToString());
-        }
     }
 }
