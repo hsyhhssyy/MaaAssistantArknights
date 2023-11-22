@@ -327,7 +327,7 @@ bool asst::AutoRecruitTask::recruit_one(const Rect& button)
 
     if (need_exit()) return false;
 
-    if (true) {
+    if (!confirm()) {
         Log.info("Failed to confirm current recruit config.");
         click_return_button();
         return false;
@@ -787,7 +787,7 @@ void asst::AutoRecruitTask::upload_to_yituliu(const json::value& details)
         m_report_yituliu_task_ptr = std::make_shared<ReportDataTask>(report_yituliu_callback, this);
     }
 
-    m_report_yituliu_task_ptr->set_report_type(ReportType::YituliuBigData)
+    m_report_yituliu_task_ptr->set_report_type(ReportType::YituliuBigDataAutoRecruit)
         .set_body(body.to_string())
         .set_retry_times(0)
         .run();

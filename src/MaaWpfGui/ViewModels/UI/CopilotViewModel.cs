@@ -245,7 +245,7 @@ namespace MaaWpfGui.ViewModels.UI
 
         private const string TempCopilotFile = "cache/_temp_copilot.json";
         private string _taskType = "General";
-        private const string StageNameRegex = @"(?:[a-z]{0,3})(?:\d{0,2})-(?:(?:A|B|C|D|EX)-)?(?:\d{1,2})";
+        private const string StageNameRegex = @"(?:[a-z]{0,3})(?:\d{0,2})-(?:(?:A|B|C|D|EX|S|TR)-)?(?:\d{1,2})";
 
         /// <summary>
         /// 为自动战斗列表匹配名字
@@ -435,7 +435,7 @@ namespace MaaWpfGui.ViewModels.UI
         {
             if (Clipboard.ContainsText())
             {
-                Filename = Clipboard.GetText();
+                Filename = Clipboard.GetText().Trim();
             }
             else if (Clipboard.ContainsFileDropList())
             {
@@ -621,6 +621,14 @@ namespace MaaWpfGui.ViewModels.UI
         {
             get => _addTrust;
             set => SetAndNotify(ref _addTrust, value);
+        }
+
+        private bool _useSanityPotion;
+
+        public bool UseSanityPotion
+        {
+            get => _useSanityPotion;
+            set => SetAndNotify(ref _useSanityPotion, value);
         }
 
         private bool _addUserAdditional = bool.Parse(ConfigurationHelper.GetValue(ConfigurationKeys.CopilotAddUserAdditional, false.ToString()));
@@ -914,7 +922,7 @@ namespace MaaWpfGui.ViewModels.UI
                         continue;
                     }
 
-                    ret &= Instances.AsstProxy.AsstStartCopilot(model.FilePath, Form, AddTrust, AddUserAdditional, mUserAdditional, UseCopilotList, model.Name.Replace("-Adverse", string.Empty), model.Name.Contains("-Adverse"), _taskType, Loop ? LoopTimes : 1, false);
+                    ret &= Instances.AsstProxy.AsstStartCopilot(model.FilePath, Form, AddTrust, AddUserAdditional, mUserAdditional, UseCopilotList, model.Name.Replace("-Adverse", string.Empty), model.Name.Contains("-Adverse"), _taskType, Loop ? LoopTimes : 1, _useSanityPotion, false);
                     startAny = true;
                 }
 
@@ -933,7 +941,7 @@ namespace MaaWpfGui.ViewModels.UI
             }
             else
             {
-                ret &= Instances.AsstProxy.AsstStartCopilot(IsDataFromWeb ? TempCopilotFile : Filename, Form, AddTrust, AddUserAdditional, mUserAdditional, UseCopilotList, string.Empty, false, _taskType, Loop ? LoopTimes : 1);
+                ret &= Instances.AsstProxy.AsstStartCopilot(IsDataFromWeb ? TempCopilotFile : Filename, Form, AddTrust, AddUserAdditional, mUserAdditional, UseCopilotList, string.Empty, false, _taskType, Loop ? LoopTimes : 1, _useSanityPotion);
             }
 
             if (ret)

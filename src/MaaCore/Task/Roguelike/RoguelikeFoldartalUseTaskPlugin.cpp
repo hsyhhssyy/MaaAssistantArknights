@@ -14,15 +14,15 @@ bool asst::RoguelikeFoldartalUseTaskPlugin::verify(AsstMsg msg, const json::valu
         return false;
     }
 
-    if (m_roguelike_theme.empty()) {
+    if (m_config->get_theme().empty()) {
         Log.error("Roguelike name doesn't exist!");
         return false;
     }
-    if (m_roguelike_theme != "Sami") {
+    if (m_config->get_theme() != RoguelikeTheme::Sami) {
         return false;
     }
-    std::string mode = status()->get_properties(Status::RoguelikeMode).value();
-    std::string task_name_pre = m_roguelike_theme + "@Roguelike@Stage";
+    auto mode = m_config->get_mode();
+    std::string task_name_pre = m_config->get_theme() + "@Roguelike@Stage";
     const std::string& task = details.get("details", "task", "");
     std::string_view task_view = task;
 
@@ -39,28 +39,28 @@ bool asst::RoguelikeFoldartalUseTaskPlugin::verify(AsstMsg msg, const json::valu
         task_view.remove_suffix(task_name_suf.length());
     }
     if (task_view == "CombatDps" || task_view == "EmergencyDps" || task_view == "FerociousPresage") {
-        if (mode == "1" || mode == "4") {
+        if (mode == RoguelikeMode::Investment || mode == RoguelikeMode::Collectible) {
             m_stage = "SkipBattle";
         }
-        else if (mode == "0") {
+        else if (mode == RoguelikeMode::Exp) {
             m_stage = "Battle";
         }
         return true;
     }
-    if (task_view == "DreadfulFoe-5" && mode == "0") {
+    if (task_view == "DreadfulFoe-5" && mode == RoguelikeMode::Exp) {
         m_stage = "Boss";
         return true;
     }
-    if (task_view == "Trader" && mode == "0") {
+    if (task_view == "Trader" && mode == RoguelikeMode::Exp) {
         m_stage = "Trader";
         return true;
     }
-    if (task_view == "Encounter" && mode == "0") {
+    if (task_view == "Encounter" && mode == RoguelikeMode::Exp) {
         m_stage = "Encounter";
         return true;
     }
     if ((task_view == "Gambling" || task_view == "EmergencyTransportation" || task_view == "WindAndRain") &&
-        mode == "0") {
+        mode == RoguelikeMode::Exp) {
         m_stage = "Gambling";
         return true;
     }
@@ -73,65 +73,58 @@ bool asst::RoguelikeFoldartalUseTaskPlugin::_run()
 {
     LogTraceFunction;
 
-    std::string theme = m_roguelike_theme;
+    std::vector<RoguelikeFoldartalCombination> combination = RoguelikeFoldartal.get_combination(m_config->get_theme());
 
-    std::vector<RoguelikeFoldartalCombination> combination = RoguelikeFoldartal.get_combination(m_roguelike_theme);
-
-    std::string overview_str =
-        status()->get_str(Status::RoguelikeFoldartalOverview).value_or(json::value().to_string());
-    json::value overview_json = json::parse(overview_str).value_or(json::value());
-    m_all_boards = overview_json.as_array();
-    Log.debug("All foldartal got yet:", m_all_boards);
-    for (const auto& usage : combination) {
-        if (need_exit()) {
-            return false;
-        }
-        if (m_stage == usage.usage) {
-            // 用到没得用为止,但是只要没有使用成功就不继续使用
-            while (search_enable_pair(usage) && !need_exit()) {
-                Log.info("Use board pairs");
-            }
-            break;
-        }
+    auto foldartal_list = m_config->get_foldartal();
+    Log.debug("All foldartal got yet:", foldartal_list);
+    if (auto it = ranges::find_if(combination,
+                                  [&](const RoguelikeFoldartalCombination& usage) { return m_stage == usage.usage; });
+        it != combination.end()) {
+        search_enable_pair(foldartal_list, *it);
     }
 
     return true;
 }
 
-bool asst::RoguelikeFoldartalUseTaskPlugin::search_enable_pair(const auto& usage)
+bool asst::RoguelikeFoldartalUseTaskPlugin::search_enable_pair(std::vector<std::string>& list,
+                                                               const asst::RoguelikeFoldartalCombination& usage)
 {
     LogTraceFunction;
-
-    for (const auto& pair : usage.pairs) {
-        // 遍历上板子
-        for (const auto& up_board : pair.up_board) {
-            // 遍历下板子
-            for (const auto& down_board : pair.down_board) {
-                if (board_pair(up_board, down_board)) return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-bool asst::RoguelikeFoldartalUseTaskPlugin::board_pair(const std::string& up_board, const std::string& down_board)
-{
-
-    auto iter_up = std::find(m_all_boards.begin(), m_all_boards.end(), up_board);
-    auto iter_down = std::find(m_all_boards.begin(), m_all_boards.end(), down_board);
-    // 如果两个板子同时存在m_all_boards中
-    if (iter_up != m_all_boards.end() && iter_down != m_all_boards.end()) {
+    auto check_pair_succ = [&](const std::string& up_board, const std::string& down_board, const auto& iter_up) {
         if (use_board(up_board, down_board)) {
             // 用完删除上板子和下板子
-            m_all_boards.erase(iter_up);
-            iter_down = std::find(m_all_boards.begin(), m_all_boards.end(), down_board);
-            m_all_boards.erase(iter_down);
-            status()->set_str(Status::RoguelikeFoldartalOverview, m_all_boards.to_string());
-            Log.debug("Board pair used");
-            return true;
+            list.erase(iter_up);
+            auto iter_down = std::find(list.begin(), list.end(), down_board);
+            list.erase(iter_down);
+            Log.debug("Board pair used, up:", up_board, ", down:", down_board);
         }
-    }
+    };
+    auto check_pair = [&](const auto& pair) {
+        // 遍历上板子
+        for (const std::string& up_board : pair.up_board) {
+            if (need_exit()) {
+                break;
+            }
+            auto iter_up = std::find(list.begin(), list.end(), up_board);
+            if (iter_up == list.end()) {
+                continue;
+            }
+            // 遍历下板子
+            for (const std::string& down_board : pair.down_board) {
+                if (need_exit()) {
+                    break;
+                }
+                auto iter_down = std::find(list.begin(), list.end(), down_board);
+                if (iter_down == list.end()) {
+                    continue;
+                }
+                check_pair_succ(up_board, down_board, iter_up);
+            }
+        }
+    };
+
+    ranges::for_each(usage.pairs, check_pair);
+
     return false;
 }
 
@@ -139,16 +132,16 @@ bool asst::RoguelikeFoldartalUseTaskPlugin::use_board(const std::string& up_boar
 {
     Log.trace("Try to use the board pair", up_board, down_board);
 
-    if (ProcessTask(*this, { m_roguelike_theme + "@Roguelike@Foldartal" }).run()) {
+    if (ProcessTask(*this, { m_config->get_theme() + "@Roguelike@Foldartal" }).run()) {
         swipe_to_top();
         // todo:插入一个滑动时顺便更新密文板overview,因为有的板子可以用两次
         if (search_and_click_board(up_board) && search_and_click_board(down_board)) {
             search_and_click_stage();
-            if (ProcessTask(*this, { m_roguelike_theme + "@Roguelike@FoldartalUseConfirm" }).run()) {
+            if (ProcessTask(*this, { m_config->get_theme() + "@Roguelike@FoldartalUseConfirm" }).run()) {
                 return true;
             }
         }
-        ProcessTask(*this, { m_roguelike_theme + "@Roguelike@FoldartalBack" }).run();
+        ProcessTask(*this, { m_config->get_theme() + "@Roguelike@FoldartalBack" }).run();
     }
     return false;
 }
@@ -161,7 +154,7 @@ bool asst::RoguelikeFoldartalUseTaskPlugin::search_and_click_board(const std::st
     int try_time = 0;
     while (try_time < max_retry && !need_exit()) {
         OCRer analyzer(ctrler()->get_image());
-        std::string task_name = m_roguelike_theme + "@Roguelike@FoldartalUseOcr";
+        std::string task_name = m_config->get_theme() + "@Roguelike@FoldartalUseOcr";
         analyzer.set_task_info(task_name);
         analyzer.set_required({ board });
         if (!analyzer.analyze()) {
@@ -187,13 +180,13 @@ bool asst::RoguelikeFoldartalUseTaskPlugin::search_and_click_stage()
     sleep(1000);
 
     // 节点会闪烁，所以这里不用单次Match
-    if (ProcessTask(*this, { m_roguelike_theme + "@Roguelike@FoldartalUseOnStage" }).run()) {
+    if (ProcessTask(*this, { m_config->get_theme() + "@Roguelike@FoldartalUseOnStage" }).run()) {
         return true;
     }
     // 滑到最右边，萨米的地图只有两页，暂时先这么糊着，出现识别不到再写循环
     ProcessTask(*this, { "SwipeToTheRight" }).run();
     sleep(1000);
-    if (ProcessTask(*this, { m_roguelike_theme + "@Roguelike@FoldartalUseOnStage" }).run()) {
+    if (ProcessTask(*this, { m_config->get_theme() + "@Roguelike@FoldartalUseOnStage" }).run()) {
         return true;
     }
     return false;
@@ -209,7 +202,7 @@ void asst::RoguelikeFoldartalUseTaskPlugin::swipe_to_top()
     while (try_time < max_retry && !need_exit()) {
         while (try_time < max_retry && !need_exit()) {
             OCRer analyzer(ctrler()->get_image());
-            analyzer.set_task_info(m_roguelike_theme + "@Roguelike@FoldartalUseOcr");
+            analyzer.set_task_info(m_config->get_theme() + "@Roguelike@FoldartalUseOcr");
             if (analyzer.analyze()) {
                 return;
             }

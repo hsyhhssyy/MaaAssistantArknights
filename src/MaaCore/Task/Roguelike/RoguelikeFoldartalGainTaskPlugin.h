@@ -1,13 +1,12 @@
 #pragma once
-#include "RoguelikeConfig.h"
-#include "Task/AbstractTaskPlugin.h"
+#include "AbstractRoguelikeTaskPlugin.h"
 
 namespace asst
 {
-    class RoguelikeFoldartalGainTaskPlugin : public AbstractTaskPlugin, public RoguelikeConfig
+    class RoguelikeFoldartalGainTaskPlugin : public AbstractRoguelikeTaskPlugin
     {
     public:
-        using AbstractTaskPlugin::AbstractTaskPlugin;
+        using AbstractRoguelikeTaskPlugin::AbstractRoguelikeTaskPlugin;
         virtual ~RoguelikeFoldartalGainTaskPlugin() override = default;
 
     public:
@@ -17,8 +16,10 @@ namespace asst
         virtual bool _run() override;
 
     private:
-        json::array get_array(auto& status_string);
-        bool store_to_status(std::string foldartal, auto& status_string);
+        void enter_next_floor();
+        bool gain_stage_award();
+
+        void gain_foldartal(std::string name);
         // 战斗后识别密文板
         mutable bool m_ocr_after_combat = false;
         // 进入新一层后识别密文板
